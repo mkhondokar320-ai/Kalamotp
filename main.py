@@ -5,17 +5,17 @@ import re
 from collections import deque
 
 # --- ⚙️ DUAL API CONFIGURATION ---
-# API 1 (Old)
+# API 1
 API_1_URL = "http://203.161.58.20/api/functions/agent-api/otp" 
 API_1_KEY = "sk_b331fc25989e09a87e32cd047f13d4ff346696b821c556cb642075d293f8ee35"
 
-# API 2 (New)
+# API 2
 API_2_URL = "http://147.135.212.197/crapi/had/viewstats"
 API_2_TOKEN = "RVFRQTRSQnxgk2NDSJiAZERTmIdSa49rXIB3fYJ_YVJXmICIdIyB"
 
 # Telegram Bot Config
 BOT_TOKEN = "8364756844:AAFGuS6NTl7MzSJt3TjuD4OoMSTXO4KFjYY"
-CHAT_ID = "-1003949125440" 
+CHAT_ID = "-1003880345384" 
 
 POLL_INTERVAL = 5 
 FETCH_RECORDS = 50 
@@ -42,6 +42,7 @@ def send_to_telegram(number, platform, message, otp_code_api=None):
     otp_code = otp_code_api if otp_code_api else extract_otp(message)
     masked_num = mask_number(number)
     
+    # --- 📝 উপরের টেক্সটে আপনার দেওয়া অরিজিনাল বক্স ডিজাইন ---
     text = f"🌟 <b>𝑰𝑵𝑺 𝑯𝑼𝑩𝑬 𝑶𝑻𝑷</b> 🌟\n\n"
     text += f"💎 <b>𝑺𝒆𝒓𝒗𝒊𝒄𝒆:</b> {platform.upper()}\n\n"
     
@@ -49,19 +50,18 @@ def send_to_telegram(number, platform, message, otp_code_api=None):
     text += f"    <code>+{masked_num}</code>\n"
     text += f"└──────────────────────────┘\n\n"
     
+    text += f"✨ 𝑷𝒐𝒘𝒆𝒓𝒆𝒅 𝒃𝒚 <a href='https://t.me/Minhaz_Official'>𝑴𝒊𝒏𝒉𝒂𝒛</a> ✨"
     
-    
+    # --- 🔘 নিচে ছোট ছোট বাটন পাশাপাশি (Compact Design) ---
     keyboard = {
         "inline_keyboard": [
             [
                 {"text": f"🔑 {otp_code}", "copy_text": {"text": otp_code}},
-                {"text": "📝 𝑭𝒖𝒍𝒍 𝑴𝒆𝒔𝒔𝒂𝒈𝒆", "copy_text": {"text": message[:256]}}
+                {"text": "📝 𝑭𝒖𝒍𝒍 𝑴𝒔𝒈", "copy_text": {"text": message[:256]}}
             ],
             [
-                {"text": "🔥 𝑮𝑬𝑻 𝑵𝑼𝑴𝑩𝑬𝑹 🔥", "url": "https://t.me/INSHUBE_BOT"}
-            ],
-            [
-                {"text": "🌟 𝑴𝒂𝒊𝒏 𝑪𝒉𝒂𝒏𝒏𝒆𝒍", "url": "https://t.me/Minhaz_Official"}
+                {"text": "🔥 𝑮𝒆𝒕 𝑵𝒖𝒎𝒃𝒆𝒓", "url": "https://t.me/INSHUBE_BOT"},
+                {"text": "🌟 𝑪𝒉𝒂𝒏𝒏𝒆𝒍", "url": "https://t.me/Minhaz_Official"}
             ]
         ]
     }
@@ -113,7 +113,7 @@ def fetch_api_2():
     return []
 
 def main():
-    print("🚀 DUAL ENGINE Running... (Anti-Timeout Mode Enabled)")
+    print("🚀 DUAL ENGINE Running... (Custom Box + Compact Buttons)")
     
     while True:
         # ----------------- Check API 1 -----------------
