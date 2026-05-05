@@ -13,8 +13,8 @@ API_1_KEY = "sk_b331fc25989e09a87e32cd047f13d4ff346696b821c556cb642075d293f8ee35
 API_2_URL = "http://147.135.212.197/crapi/had/viewstats"
 API_2_TOKEN = "RVFRQTRSQnxgk2NDSJiAZERTmIdSa49rXIB3fYJ_YVJXmICIdIyB"
 
-# Telegram Bot Config (⚠️ Ekhane obossoi notun token diben)
-BOT_TOKEN = "8364756844:AAFGuS6NTl7MzSJt3TjuD4OoMSTXO4KFjYY"
+# Telegram Bot Config
+BOT_TOKEN = "8364756844:AAFrxV2a9wnpqGfciz8GYllpfn1_nUQmn90"
 CHAT_ID = "-1003880345384" 
 
 POLL_INTERVAL = 5 
@@ -23,27 +23,28 @@ FETCH_RECORDS = 50
 seen_otps = deque(maxlen=4000)
 
 def extract_otp(message):
-    message_lower = message.lower()
+    message_str = str(message)
+    message_lower = message_str.lower()
     
-    # 1. App Specific Match (Instagram, FB, Google)
-    app_match = re.search(r'(?:ig|fb|g|instagram|facebook)[^\d]*(\d{4,8})', message_lower)
-    if app_match: 
-        return app_match.group(1)
-        
-    # 2. Keyword Match (code, otp, pin er pashe thaka number)
-    keyword_match = re.search(r'(?:code|otp|pin|verification)[^\d]*(\d{4,8})', message_lower)
+    # 1. কিওয়ার্ড অনুযায়ী শক্তিশালী সার্চ (ig, fb, g, code, otp, pin)
+    keyword_match = re.search(r'(?:ig|fb|g|instagram|facebook|code|otp|pin)[^\d]*(\d{4,10})', message_lower)
     if keyword_match:
         return keyword_match.group(1)
     
-    # 3. 6-digit split number (e.g., 123-456 or 123 456)
-    space_match = re.search(r'\b(\d{3})[\s-](\d{3})\b', message)
-    if space_match: 
-        return space_match.group(1) + space_match.group(2)
+    # 2. মাঝখানে স্পেস বা হাইফেন থাকলে (যেমন: 123-456 বা 123 456)
+    split_match = re.search(r'\b(\d{3,4})[\s-](\d{3,4})\b', message_str)
+    if split_match: 
+        return split_match.group(1) + split_match.group(2)
     
-    # 4. Universal Fallback (Jekono 4 theke 8 digit er number)
-    numbers = re.findall(r'\b\d{4,8}\b', message)
+    # 3. ইউনিভার্সাল ফিল্টার (মেসেজের ভেতর থেকে যেকোনো সংখ্যা বের করবে)
+    numbers = re.findall(r'\d+', message_str)
     if numbers:
-        return numbers[0]
+        # প্রথমে চেষ্টা করবে ৪ থেকে ১০ ডিজিটের স্ট্যান্ডার্ড ওটিপি ধরতে
+        for n in numbers:
+            if 4 <= len(n) <= 10:
+                return n
+        # যদি না পায়, তাহলে মেসেজে পাওয়া প্রথম সংখ্যাটাই দিয়ে দেবে (সর্বোচ্চ ১০ ডিজিট)
+        return numbers[0][:10]
         
     return "Copy"
 
@@ -53,11 +54,9 @@ def mask_number(num):
         return f"{num[:2]}𝑰𝑵𝑺𝑯𝑼𝑩𝑬{num[-3:]}"
     return num
 
-def send_to_telegram(number, platform, message, otp_code_api=None):
+def send_to_telegram(number, platform, message, final_otp_code):
     url = f"https://api.telegram.org/bot{BOT_TOKEN}/sendMessage"
     
-    # API code na dile Extract function theke nibe
-    otp_code = otp_code_api if otp_code_api and len(str(otp_code_api)) >= 4 else extract_otp(message)
     masked_num = mask_number(number)
     
     # --- 📝 Text Design ---
@@ -71,7 +70,7 @@ def send_to_telegram(number, platform, message, otp_code_api=None):
     keyboard = {
         "inline_keyboard": [
             [
-                {"text": f"🔑 {otp_code}", "copy_text": {"text": otp_code}}
+                {"text": f"🔑 {final_otp_code}", "copy_text": {"text": final_otp_code}}
             ],
             [
                 {"text": "🔥 𝑮𝒆𝒕 𝑵𝒖𝒎𝒃𝒆𝒓", "url": "https://t.me/INSHUBE_BOT"},
@@ -97,7 +96,6 @@ def send_to_telegram(number, platform, message, otp_code_api=None):
                 print(f"⚠️ Telegram Error: {response.text}")
             break 
         except requests.exceptions.ReadTimeout:
-            print(f"⚠️ Telegram Timeout. Retrying... ({attempt + 1}/{max_retries})")
             time.sleep(2) 
         except Exception as e: 
             print(f"❌ Telegram Send Error: {e}")
@@ -127,7 +125,7 @@ def fetch_api_2():
     return []
 
 def main():
-    print("🚀 ALL OTP EXTRACTOR Running... (Instagram, FB, WhatsApp & Others)")
+    print("🚀 ALL OTP EXTRACTOR Running... (Max Precision Mode)")
     
     while True:
         # ----------------- Check API 1 -----------------
@@ -141,14 +139,24 @@ def main():
             number = str(otp.get("number", "Unknown"))
             platform = str(otp.get("platform", "Service"))
             dt = str(otp.get("received_at", "time"))
-            otp_code = str(otp.get("otp_code", ""))
+            
+            # 🔥 "None" Bug Fix: API যদি None বা উল্টাপাল্টা কিছু দেয়, সরাসরি Extract করবে
+            api_otp = otp.get("otp_code")
+            if not api_otp or str(api_otp).lower() == "none" or str(api_otp).strip() == "":
+                final_otp = extract_otp(message)
+            else:
+                api_otp_str = str(api_otp)
+                # API এর ওটিপি যদি ৪ থেকে ১০ ডিজিটের মধ্যে হয়, তবেই সেটা নেবে
+                if 4 <= len(api_otp_str) <= 10:
+                    final_otp = api_otp_str
+                else:
+                    final_otp = extract_otp(message)
             
             otp_id = hashlib.md5(f"API1_{dt}_{number}_{message}".encode()).hexdigest()
             
             if otp_id not in seen_otps:
-                send_to_telegram(number, platform, message, otp_code)
+                send_to_telegram(number, platform, message, final_otp)
                 seen_otps.append(otp_id)
-                final_otp = otp_code if otp_code and len(str(otp_code)) >= 4 else extract_otp(message)
                 print(f"✅ [API 1] OTP Forwarded: {final_otp}")
                 time.sleep(0.5)
                 
@@ -166,10 +174,10 @@ def main():
             otp_id = hashlib.md5(f"API2_{dt}_{number}_{message}".encode()).hexdigest()
             
             if otp_id not in seen_otps:
-                otp_code = extract_otp(message)
-                send_to_telegram(number, platform, message, otp_code)
+                final_otp = extract_otp(message)
+                send_to_telegram(number, platform, message, final_otp)
                 seen_otps.append(otp_id)
-                print(f"✅ [API 2] OTP Forwarded: {otp_code}")
+                print(f"✅ [API 2] OTP Forwarded: {final_otp}")
                 time.sleep(0.5)
 
         time.sleep(POLL_INTERVAL)
