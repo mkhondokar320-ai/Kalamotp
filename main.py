@@ -14,7 +14,8 @@ API_2_URL = "http://147.135.212.197/crapi/had/viewstats"
 API_2_TOKEN = "RVFRQTRSQnxgk2NDSJiAZERTmIdSa49rXIB3fYJ_YVJXmICIdIyB"
 
 # Telegram Bot Config
-BOT_TOKEN = "8364756844:AAFGuS6NTl7MzSJt3TjuD4OoMSTXO4KFjYY"
+# ⚠️ আপনাকে অবশ্যই BotFather থেকে নতুন টোকেন এনে এখানে বসাতে হবে। 
+BOT_TOKEN = "8364756844:AAFrxV2a9wnpqGfciz8GYllpfn1_nUQmn90"
 CHAT_ID = "-1003880345384" 
 
 POLL_INTERVAL = 5 
@@ -23,10 +24,21 @@ FETCH_RECORDS = 50
 seen_otps = deque(maxlen=4000)
 
 def extract_otp(message):
-    ig_match = re.search(r'(?i)ig[- ]?(\d+)', message)
+    message_lower = message.lower()
+    
+    # Instagram Match (e.g., ig 123456, IG-123456, Instagram code: 123456)
+    ig_match = re.search(r'(?:ig|instagram)[^\d]*(\d{6})', message_lower)
     if ig_match: return ig_match.group(1)
+    
+    # Facebook Match (e.g., FB-123456, Facebook code 123456)
+    fb_match = re.search(r'(?:fb|facebook)[^\d]*(\d{6,8})', message_lower)
+    if fb_match: return fb_match.group(1)
+    
+    # WhatsApp / generic 6-digit split (e.g., 123-456 or 123 456)
     space_match = re.search(r'\b(\d{3})[\s-](\d{3})\b', message)
     if space_match: return space_match.group(1) + space_match.group(2)
+    
+    # Generic 4 to 8 digits fallback
     match2 = re.search(r'\b\d{4,8}\b', message)
     return match2.group(0) if match2 else "Copy"
 
