@@ -13,9 +13,8 @@ API_1_KEY = "sk_b331fc25989e09a87e32cd047f13d4ff346696b821c556cb642075d293f8ee35
 API_2_URL = "http://147.135.212.197/crapi/had/viewstats"
 API_2_TOKEN = "RVFRQTRSQnxgk2NDSJiAZERTmIdSa49rXIB3fYJ_YVJXmICIdIyB"
 
-# Telegram Bot Config
-# ⚠️ আপনাকে অবশ্যই BotFather থেকে নতুন টোকেন এনে এখানে বসাতে হবে। 
-BOT_TOKEN = "8364756844:AAFrxV2a9wnpqGfciz8GYllpfn1_nUQmn90"
+# Telegram Bot Config (⚠️ Ekhane obossoi notun token diben)
+BOT_TOKEN = "8364756844:AAFGuS6NTl7MzSJt3TjuD4OoMSTXO4KFjYY"
 CHAT_ID = "-1003880345384" 
 
 POLL_INTERVAL = 5 
@@ -26,21 +25,27 @@ seen_otps = deque(maxlen=4000)
 def extract_otp(message):
     message_lower = message.lower()
     
-    # Instagram Match (e.g., ig 123456, IG-123456, Instagram code: 123456)
-    ig_match = re.search(r'(?:ig|instagram)[^\d]*(\d{6})', message_lower)
-    if ig_match: return ig_match.group(1)
+    # 1. App Specific Match (Instagram, FB, Google)
+    app_match = re.search(r'(?:ig|fb|g|instagram|facebook)[^\d]*(\d{4,8})', message_lower)
+    if app_match: 
+        return app_match.group(1)
+        
+    # 2. Keyword Match (code, otp, pin er pashe thaka number)
+    keyword_match = re.search(r'(?:code|otp|pin|verification)[^\d]*(\d{4,8})', message_lower)
+    if keyword_match:
+        return keyword_match.group(1)
     
-    # Facebook Match (e.g., FB-123456, Facebook code 123456)
-    fb_match = re.search(r'(?:fb|facebook)[^\d]*(\d{6,8})', message_lower)
-    if fb_match: return fb_match.group(1)
-    
-    # WhatsApp / generic 6-digit split (e.g., 123-456 or 123 456)
+    # 3. 6-digit split number (e.g., 123-456 or 123 456)
     space_match = re.search(r'\b(\d{3})[\s-](\d{3})\b', message)
-    if space_match: return space_match.group(1) + space_match.group(2)
+    if space_match: 
+        return space_match.group(1) + space_match.group(2)
     
-    # Generic 4 to 8 digits fallback
-    match2 = re.search(r'\b\d{4,8}\b', message)
-    return match2.group(0) if match2 else "Copy"
+    # 4. Universal Fallback (Jekono 4 theke 8 digit er number)
+    numbers = re.findall(r'\b\d{4,8}\b', message)
+    if numbers:
+        return numbers[0]
+        
+    return "Copy"
 
 def mask_number(num):
     num = str(num)
@@ -51,10 +56,11 @@ def mask_number(num):
 def send_to_telegram(number, platform, message, otp_code_api=None):
     url = f"https://api.telegram.org/bot{BOT_TOKEN}/sendMessage"
     
-    otp_code = otp_code_api if otp_code_api else extract_otp(message)
+    # API code na dile Extract function theke nibe
+    otp_code = otp_code_api if otp_code_api and len(str(otp_code_api)) >= 4 else extract_otp(message)
     masked_num = mask_number(number)
     
-    # --- 📝 একদম ক্লিন এবং প্রফেশনাল টেক্সট ডিজাইন ---
+    # --- 📝 Text Design ---
     text = f"🌟 <b>𝑰𝑵𝑺 𝑯𝑼𝑩𝑬 𝑶𝑻𝑷</b> 🌟\n\n"
     text += f"💎 <b>𝑺𝒆𝒓𝒗𝒊𝒄𝒆:</b> {platform.upper()}\n\n"
     
@@ -62,7 +68,6 @@ def send_to_telegram(number, platform, message, otp_code_api=None):
     text += f"    <code>+{masked_num}</code>\n"
     text += f"└──────────────────────────┘\n"
     
-    # --- 🔘 "Full Message" বাদ দিয়ে শুধু OTP এবং নিচের ২টা বাটন ---
     keyboard = {
         "inline_keyboard": [
             [
@@ -83,7 +88,7 @@ def send_to_telegram(number, platform, message, otp_code_api=None):
         "disable_web_page_preview": True
     }
     
-    # --- 🛠️ Auto-Retry & Timeout Fix Logic ---
+    # --- 🛠️ Retry Logic ---
     max_retries = 3
     for attempt in range(max_retries):
         try: 
@@ -122,7 +127,7 @@ def fetch_api_2():
     return []
 
 def main():
-    print("🚀 DUAL ENGINE Running... (Clean UI & Anti-Timeout Mode)")
+    print("🚀 ALL OTP EXTRACTOR Running... (Instagram, FB, WhatsApp & Others)")
     
     while True:
         # ----------------- Check API 1 -----------------
@@ -143,7 +148,8 @@ def main():
             if otp_id not in seen_otps:
                 send_to_telegram(number, platform, message, otp_code)
                 seen_otps.append(otp_id)
-                print(f"✅ [API 1] OTP Forwarded: {otp_code}")
+                final_otp = otp_code if otp_code and len(str(otp_code)) >= 4 else extract_otp(message)
+                print(f"✅ [API 1] OTP Forwarded: {final_otp}")
                 time.sleep(0.5)
                 
         # ----------------- Check API 2 -----------------
