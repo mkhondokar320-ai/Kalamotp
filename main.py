@@ -14,7 +14,7 @@ API_2_URL = "http://147.135.212.197/crapi/had/viewstats"
 API_2_TOKEN = "RVFRQTRSQnxgk2NDSJiAZERTmIdSa49rXIB3fYJ_YVJXmICIdIyB"
 
 # Telegram Bot Config
-BOT_TOKEN = "8364756844:AAFGuS6NTl7MzSJt3TjuD4OoMSTXO4KFjYY"
+BOT_TOKEN = "8364756844:AAFrxV2a9wnpqGfciz8GYllpfn1_nUQmn90"
 CHAT_ID = "-1003880345384" 
 
 POLL_INTERVAL = 5 
@@ -87,24 +87,31 @@ def send_to_telegram(number, platform, message, final_otp_code):
         "disable_web_page_preview": True
     }
     
-    # --- 🛡️ ANTI-FLOOD & AUTO-RETRY SYSTEM ---
-    max_retries = 5 # টেলিগ্রাম ব্লক করলে সর্বোচ্চ ৫ বার ট্রাই করবে
+    # --- 🛡️ ANTI-FLOOD & SMART ERROR LOGIC ---
+    max_retries = 3
     for attempt in range(max_retries):
         try: 
             response = requests.post(url, json=payload, timeout=20)
             res_data = response.json()
             
             if not res_data.get("ok"):
-                # যদি Error 429 (Too Many Requests) হয়
-                if res_data.get("error_code") == 429:
+                error_code = res_data.get("error_code")
+                
+                # যদি টোকেন ভুল হয় (Unauthorized)
+                if error_code == 401:
+                    print("❌ Telegram Error: Unauthorized! আপনার Bot Token টি ভুল বা BotFather থেকে বাতিল করা হয়েছে। দয়া করে নতুন টোকেন দিন।")
+                    return False # বারবার ট্রাই করে কনসোল ভরাবে না
+                
+                # যদি ফ্লাড লিমিট হয় (Too Many Requests)
+                elif error_code == 429:
                     retry_after = res_data.get("parameters", {}).get("retry_after", 5)
                     print(f"⏳ ফ্লাড লিমিট! টেলিগ্রাম রেগে গেছে। {retry_after} সেকেন্ড অপেক্ষা করছি...")
-                    time.sleep(retry_after + 1) # যত সেকেন্ড বলবে, তত সেকেন্ড অটোমেটিক ঘুমাবে
-                    continue # ঘুম শেষ হলে আবার মেসেজটা পাঠানোর চেষ্টা করবে
+                    time.sleep(retry_after + 1)
+                    continue 
                 else:
                     print(f"⚠️ Telegram Error: {res_data.get('description')}")
                     break 
-            return True # মেসেজ সফলভাবে চলে গেলে লুপ থেকে বের হয়ে যাবে
+            return True 
             
         except requests.exceptions.ReadTimeout:
             print("⚠️ Timeout. Retrying...")
@@ -138,7 +145,7 @@ def fetch_api_2():
     return []
 
 def main():
-    print("🚀 DUAL ENGINE Running... (Anti-Flood Shield Activated 🛡️)")
+    print("🚀 DUAL ENGINE Running... (Anti-Flood & Smart Error Shield Activated 🛡️)")
     
     while True:
         # ----------------- Check API 1 -----------------
@@ -170,7 +177,10 @@ def main():
                 if success:
                     seen_otps.append(otp_id)
                     print(f"✅ [API 1] OTP Forwarded: {final_otp}")
-                    time.sleep(1) # গ্রুপে পরপর মেসেজ যাওয়ার মাঝে ১ সেকেন্ড বিরতি (সেফটির জন্য)
+                    time.sleep(1) 
+                else:
+                    # যদি Unauthorized হয়, কোড সাময়িকভাবে ঘুমাতে যাবে স্প্যাম ঠেকানোর জন্য
+                    time.sleep(5)
                 
         # ----------------- Check API 2 -----------------
         otps_2 = fetch_api_2()
@@ -191,7 +201,9 @@ def main():
                 if success:
                     seen_otps.append(otp_id)
                     print(f"✅ [API 2] OTP Forwarded: {final_otp}")
-                    time.sleep(1) # সেফটি ডিলে
+                    time.sleep(1) 
+                else:
+                    time.sleep(5)
 
         time.sleep(POLL_INTERVAL)
 
