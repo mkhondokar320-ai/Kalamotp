@@ -25,30 +25,32 @@ seen_otps = deque(maxlen=4000)
 def extract_otp(message):
     message_str = str(message)
     
-    # ১. G-123456 বা ig-1234 বা fb-12345 টাইপের স্ট্যান্ডার্ড কোড ধরা
-    prefix_match = re.search(r'(?i)(?:g|ig|fb|c|v)[- ]?(\d{4,8})', message_str)
+    # ১. WhatsApp এর জন্য স্পেশাল ফিল্টার (123-456 বা 123 456)
+    wa_match = re.search(r'(?i)whatsapp.*?(\d{3})[- ]?(\d{3})', message_str)
+    if wa_match:
+        return wa_match.group(1) + wa_match.group(2)
+        
+    # ২. যেকোনো অ্যাপের কোডে মাঝখানে স্পেস/হাইফেন থাকলে জোড়া লাগাবে (যেমন 123-456)
+    split_match = re.search(r'(?<!\d)(\d{3,4})[\s-](\d{3,4})(?!\d)', message_str)
+    if split_match:
+        return split_match.group(1) + split_match.group(2)
+        
+    # ৩. Facebook, Google, Instagram এর G-123456 বা FB-12345 টাইপ কোড
+    prefix_match = re.search(r'(?i)(?:g|ig|fb|c|v)[- ]?(\d{4,8})(?!\d)', message_str)
     if prefix_match:
         return prefix_match.group(1)
         
-    # ২. মাঝখানে স্পেস বা হাইফেন থাকলে (যেমন: 123 456 বা 123-456)
-    split_match = re.search(r'\b(\d{3,4})[\s-](\d{3,4})\b', message_str)
-    if split_match: 
-        return split_match.group(1) + split_match.group(2)
-    
-    # ৩. ইউনিভার্সাল ফিল্টার (মেসেজের সব সংখ্যা বের করবে)
+    # ৪. ফুল ওটিপি এক্সট্রাক্টর (৪ থেকে ৮ ডিজিটের যেকোনো স্ট্যান্ডঅ্যালোন কোড পুরোপুরি ধরবে)
+    # (?<!\d) এবং (?!\d) এর কারণে কোড অর্ধেক কেটে আসবে না, পুরোটাই আসবে।
+    stand_alone_match = re.findall(r'(?<!\d)(\d{4,8})(?!\d)', message_str)
+    if stand_alone_match:
+        return stand_alone_match[0]
+        
+    # ৫. ফলব্যাক (উপরের কোনোটাতে না পড়লে প্রথম সংখ্যাটাই দিবে)
     numbers = re.findall(r'\d+', message_str)
     if numbers:
-        # ফোন নাম্বার বা হাবিজাবি বড় সংখ্যা (১০ ডিজিটের বেশি) বাদ দেওয়া
-        valid_numbers = [n for n in numbers if 1 <= len(n) <= 10]
+        return numbers[0][:8]
         
-        if valid_numbers:
-            # সাধারণত ৪ থেকে ৮ ডিজিটের সংখ্যাগুলোই OTP হয়, সেটা আগে খুঁজবে
-            for n in valid_numbers:
-                if 4 <= len(n) <= 8:
-                    return n
-            # যদি ৪-৮ ডিজিটের না পায়, তাহলে ভ্যালিড প্রথম সংখ্যাটাই দিয়ে দেবে
-            return valid_numbers[0]
-            
     return "Copy"
 
 def mask_number(num):
@@ -128,7 +130,7 @@ def fetch_api_2():
     return []
 
 def main():
-    print("🚀 ALL OTP EXTRACTOR Running... (Max Precision Mode)")
+    print("🚀 ALL OTP EXTRACTOR Running... (Max Precision Mode - WA & ALL CAT FIXED)")
     
     while True:
         # ----------------- Check API 1 -----------------
@@ -143,11 +145,13 @@ def main():
             platform = str(otp.get("platform", "Service"))
             dt = str(otp.get("received_at", "time"))
             
+            # 🔥 "None" Bug Fix: API যদি None বা উল্টাপাল্টা কিছু দেয়, সরাসরি Extract করবে
             api_otp = otp.get("otp_code")
             if not api_otp or str(api_otp).lower() == "none" or str(api_otp).strip() == "":
                 final_otp = extract_otp(message)
             else:
                 api_otp_str = str(api_otp)
+                # API এর ওটিপি যদি ৪ থেকে ১০ ডিজিটের মধ্যে হয়, তবেই সেটা নেবে
                 if 4 <= len(api_otp_str) <= 10:
                     final_otp = api_otp_str
                 else:
