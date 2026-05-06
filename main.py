@@ -24,28 +24,31 @@ seen_otps = deque(maxlen=4000)
 
 def extract_otp(message):
     message_str = str(message)
-    message_lower = message_str.lower()
     
-    # 1. কিওয়ার্ড অনুযায়ী শক্তিশালী সার্চ (ig, fb, g, code, otp, pin)
-    keyword_match = re.search(r'(?:ig|fb|g|instagram|facebook|code|otp|pin)[^\d]*(\d{4,10})', message_lower)
-    if keyword_match:
-        return keyword_match.group(1)
-    
-    # 2. মাঝখানে স্পেস বা হাইফেন থাকলে (যেমন: 123-456 বা 123 456)
+    # ১. G-123456 বা ig-1234 বা fb-12345 টাইপের স্ট্যান্ডার্ড কোড ধরা
+    prefix_match = re.search(r'(?i)(?:g|ig|fb|c|v)[- ]?(\d{4,8})', message_str)
+    if prefix_match:
+        return prefix_match.group(1)
+        
+    # ২. মাঝখানে স্পেস বা হাইফেন থাকলে (যেমন: 123 456 বা 123-456)
     split_match = re.search(r'\b(\d{3,4})[\s-](\d{3,4})\b', message_str)
     if split_match: 
         return split_match.group(1) + split_match.group(2)
     
-    # 3. ইউনিভার্সাল ফিল্টার (মেসেজের ভেতর থেকে যেকোনো সংখ্যা বের করবে)
+    # ৩. ইউনিভার্সাল ফিল্টার (মেসেজের সব সংখ্যা বের করবে)
     numbers = re.findall(r'\d+', message_str)
     if numbers:
-        # প্রথমে চেষ্টা করবে ৪ থেকে ১০ ডিজিটের স্ট্যান্ডার্ড ওটিপি ধরতে
-        for n in numbers:
-            if 4 <= len(n) <= 10:
-                return n
-        # যদি না পায়, তাহলে মেসেজে পাওয়া প্রথম সংখ্যাটাই দিয়ে দেবে (সর্বোচ্চ ১০ ডিজিট)
-        return numbers[0][:10]
+        # ফোন নাম্বার বা হাবিজাবি বড় সংখ্যা (১০ ডিজিটের বেশি) বাদ দেওয়া
+        valid_numbers = [n for n in numbers if 1 <= len(n) <= 10]
         
+        if valid_numbers:
+            # সাধারণত ৪ থেকে ৮ ডিজিটের সংখ্যাগুলোই OTP হয়, সেটা আগে খুঁজবে
+            for n in valid_numbers:
+                if 4 <= len(n) <= 8:
+                    return n
+            # যদি ৪-৮ ডিজিটের না পায়, তাহলে ভ্যালিড প্রথম সংখ্যাটাই দিয়ে দেবে
+            return valid_numbers[0]
+            
     return "Copy"
 
 def mask_number(num):
@@ -140,13 +143,11 @@ def main():
             platform = str(otp.get("platform", "Service"))
             dt = str(otp.get("received_at", "time"))
             
-            # 🔥 "None" Bug Fix: API যদি None বা উল্টাপাল্টা কিছু দেয়, সরাসরি Extract করবে
             api_otp = otp.get("otp_code")
             if not api_otp or str(api_otp).lower() == "none" or str(api_otp).strip() == "":
                 final_otp = extract_otp(message)
             else:
                 api_otp_str = str(api_otp)
-                # API এর ওটিপি যদি ৪ থেকে ১০ ডিজিটের মধ্যে হয়, তবেই সেটা নেবে
                 if 4 <= len(api_otp_str) <= 10:
                     final_otp = api_otp_str
                 else:
